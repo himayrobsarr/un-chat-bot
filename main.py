@@ -15,47 +15,32 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 def excel_to_json_with_modifications(excel_file, modifications):
     """Convierte un archivo Excel a JSON con modificaciones."""
     try:
-        # Intentar leer el archivo Excel
-        st.write("Intentando leer el archivo Excel...")
         data = pd.read_excel(excel_file, sheet_name=None)
-        st.write("Archivo Excel leído correctamente.")
     except Exception as e:
         st.error(f"Error al leer el archivo Excel: {e}")
         return None
 
     result = {}
-    try:
-        for sheet_name, df in data.items():
-            st.write(f"Procesando hoja: {sheet_name}")
-            records = df.to_dict(orient='records')
+    for sheet_name, df in data.items():
+        records = df.to_dict(orient='records')
 
-            for record in records:
-                if 'add_field' in modifications:
-                    record[modifications['add_field']['field_name']] = modifications['add_field']['value']
-                if 'combine_fields' in modifications:
-                    field1 = modifications['combine_fields']['field1']
-                    field2 = modifications['combine_fields']['field2']
-                    new_field = modifications['combine_fields']['new_field']
-                    record[new_field] = f"{record.get(field1, '')} {record.get(field2, '')}"
+        for record in records:
+            if 'add_field' in modifications:
+                record[modifications['add_field']['field_name']] = modifications['add_field']['value']
+            if 'combine_fields' in modifications:
+                field1 = modifications['combine_fields']['field1']
+                field2 = modifications['combine_fields']['field2']
+                new_field = modifications['combine_fields']['new_field']
+                record[new_field] = f"{record.get(field1, '')} {record.get(field2, '')}"
 
-            result[sheet_name] = records
-        st.write("Modificaciones aplicadas exitosamente.")
-    except Exception as e:
-        st.error(f"Error al procesar las hojas de Excel: {e}")
-        return None
+        result[sheet_name] = records
 
-    try:
-        json_result = json.dumps(result, ensure_ascii=False, indent=4)
-        st.write("Conversión a JSON completada.")
-        return json_result
-    except Exception as e:
-        st.error(f"Error al convertir los datos a JSON: {e}")
-        return None
+    return json.dumps(result, ensure_ascii=False, indent=4)
 
 def obtener_recomendaciones(prompt):
     """Obtiene recomendaciones basadas en un prompt usando OpenAI."""
     try:
-        st.write("Enviando solicitud a OpenAI...")
+        # Cambiado para ser compatible con openai>=1.0.0
         response = openai.ChatCompletion.create(
             model="gpt-4",  # Cambiar por "gpt-3.5-turbo" si no tienes acceso a "gpt-4"
             messages=[
@@ -63,48 +48,31 @@ def obtener_recomendaciones(prompt):
                 {"role": "user", "content": prompt}
             ]
         )
-        st.write("Respuesta recibida de OpenAI.")
+        # Extraer la respuesta del asistente
         return response['choices'][0]['message']['content']
     except Exception as e:
-        st.error(f"Error al obtener recomendaciones: {e}")
-        return None
+        return f"Error al obtener recomendaciones: {e}"
 
 def main():
-    st.title("Conversor de Excel a JSON con OpenAI")
-
-    # Validar la clave API
-    if not openai.api_key:
-        st.error("La clave API de OpenAI no está configurada. Verifica el archivo .env.")
-        return
-
-    # Subida de archivo Excel
+    st.title("Conversor de Excel a JSON")
+    
     excel_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
     if excel_file:
-        try:
-            modifications = {
-                'add_field': {'field_name': 'createdAt', 'value': datetime.now().isoformat()},
-                'combine_fields': {'field1': 'Nombre', 'field2': 'Apellido', 'new_field': 'NombreCompleto'}
-            }
+        modifications = {
+            'add_field': {'field_name': 'createdAt', 'value': datetime.now().isoformat()},
+            'combine_fields': {'field1': 'Nombre', 'field2': 'Apellido', 'new_field': 'NombreCompleto'}
+        }
 
-            json_result = excel_to_json_with_modifications(excel_file, modifications)
-            if json_result:
-                st.json(json_result)
-                st.download_button("Descargar JSON", json_result, file_name="resultado.json", mime="application/json")
-        except Exception as e:
-            st.error(f"Error al procesar el archivo Excel: {e}")
+        json_result = excel_to_json_with_modifications(excel_file, modifications)
+        if json_result:
+            st.json(json_result)
+            st.download_button("Descargar JSON", json_result, file_name="resultado.json", mime="application/json")
 
-    # Entrada para el prompt
     prompt = st.text_input("Ingresa tu prompt para recomendaciones:")
     if st.button("Obtener Recomendaciones"):
         if prompt:
-            try:
-                recomendaciones = obtener_recomendaciones(prompt)
-                if recomendaciones:
-                    st.write(recomendaciones)
-                else:
-                    st.error("No se recibieron recomendaciones.")
-            except Exception as e:
-                st.error(f"Error al procesar el prompt: {e}")
+            recomendaciones = obtener_recomendaciones(prompt)
+            st.write(recomendaciones)
 
 if __name__ == "__main__":
     main()
